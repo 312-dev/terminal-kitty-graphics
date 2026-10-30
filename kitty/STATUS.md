@@ -34,15 +34,20 @@ Local only; never PR upstream (AGENTS.md bans AI-authored contributions).
 - [x] Test script (plain + placeholder) draws
 - [x] Claude Code + show-your-work draws (force flag in profile env)
 - [ ] Terminal Dev as the default terminal, sessions moved over
-- [ ] Scheduled rebase-and-rebuild on new Preview tags
+- [x] Scheduled rebase-and-rebuild on new Preview tags (kitty/update.ps1, task "WT Kitty Update", Sundays 3 AM)
 
-## Building
+## Building and updating
 
-C:\src\wt-build.ps1, run by the scheduled task "WT Kitty Build" under C:\src\tools\pwsh (portable
-PowerShell 7.6.9). Not from WSL: WSL passes both PATH and Path, and MSBuild dies on the duplicate
-(MSB6001). Not under the Store pwsh: build steps it starts cannot find pwsh.exe. Output msix:
-src\cascadia\CascadiaPackage\AppPackages\CascadiaPackage_0.0.1.0_x64_Test. Install: makeappx unpack
-to C:\src\wt-dev-loose, then Add-AppxPackage -Register its AppxManifest.xml (Developer Mode).
+kitty/update.ps1, run weekly by the scheduled task "WT Kitty Update" under C:\src\tools\pwsh
+(portable PowerShell 7.6.9): rebases onto the newest Preview release, builds, pushes, installs, and
+toasts. `-Force` rebuilds without a new release. A loose package registration cannot be deferred
+(`-DeferRegistrationWhenPackagesAreInUse` is not in the `-Register` parameter set), so while Terminal
+Dev runs the build is left pending in C:\src\wt-dev\PENDING and the task "WT Kitty Install" runs
+`update.ps1 -InstallPending` every 30 minutes until Terminal Dev is closed.
+Not from WSL: WSL passes both PATH and Path, and MSBuild dies on the duplicate
+(MSB6001). Not under the Store pwsh: build steps it starts cannot find pwsh.exe. Each build is
+unpacked to C:\src\wt-dev\<tag>-<time> (three kept) and registered from there (Developer Mode). The
+first build was registered from C:\src\wt-dev-loose by hand.
 
 ## Settings
 
