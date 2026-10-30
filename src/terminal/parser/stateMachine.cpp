@@ -650,13 +650,22 @@ void StateMachine::_ActionIgnore() noexcept
 // - <none>
 void StateMachine::_ActionInterrupt()
 {
-    // This is only applicable for DCS strings. OSC strings require a full
-    // ST sequence to be received before they can be dispatched.
+    // This is only applicable for DCS and APC strings. OSC strings require a
+    // full ST sequence to be received before they can be dispatched.
     if (_state == VTStates::DcsPassThrough)
     {
         // The ESC signals the end of the data string.
         _dcsStringHandler(AsciiChars::ESC);
         _dcsStringHandler = nullptr;
+    }
+    else if (_state == VTStates::SosPmApcString && _isApcString)
+    {
+        if (!_apcStringOverflowed)
+        {
+            _engine->ActionApcDispatch(_apcString);
+        }
+        _isApcString = false;
+        _apcString.clear();
     }
 }
 
@@ -1044,6 +1053,9 @@ void StateMachine::_EnterSosPmApcString() noexcept
 {
     _state = VTStates::SosPmApcString;
     _cachedSequence.reset();
+    _isApcString = false;
+    _apcString.clear();
+    _apcStringOverflowed = false;
     _engine->UnknownSequence();
     _trace.TraceStateChange(L"SosPmApcString");
 }
@@ -1143,6 +1155,7 @@ void StateMachine::_EventEscape(const wchar_t wch)
         else if (_isSosIndicator(wch) || _isPmIndicator(wch) || _isApcIndicator(wch))
         {
             _EnterSosPmApcString();
+            _isApcString = _isApcIndicator(wch);
         }
         else
         {
@@ -1818,16 +1831,39 @@ void StateMachine::_EventDcsPassThrough(const wchar_t wch)
 
 // Routine Description:
 // - Handle SOS/PM/APC string.
-//   In this state the entire string is ignored.
-//   The termination state is handled outside when an ESC is seen.
+//   SOS and PM strings are ignored. An APC string is collected, up to a size
+//   limit, and dispatched when the terminating ESC is seen, which is handled
+//   outside this state.
 // Arguments:
 // - wch - Character that triggered the event
 // Return Value:
 // - <none>
-void StateMachine::_EventSosPmApcString(const wchar_t /*wch*/) noexcept
+void StateMachine::_EventSosPmApcString(const wchar_t wch) noexcept
 {
     _trace.TraceOnEvent(L"SosPmApcString");
-    _ActionIgnore();
+    if (!_isApcString || _apcStringOverflowed)
+    {
+        _ActionIgnore();
+        return;
+    }
+    // A kitty graphics chunk is at most 4096 bytes of data plus its keys, so
+    // anything near this size is not one, and is dropped.
+    static constexpr size_t maxApcStringLength = 1024 * 1024;
+    if (_apcString.size() >= maxApcStringLength)
+    {
+        _apcStringOverflowed = true;
+        _apcString.clear();
+        return;
+    }
+    try
+    {
+        _apcString.push_back(wch);
+    }
+    catch (...)
+    {
+        _apcStringOverflowed = true;
+        _apcString.clear();
+    }
 }
 
 // Routine Description:
@@ -1849,6 +1885,8 @@ void StateMachine::ProcessCharacter(const wchar_t wch)
     // these from any state.
     if (isFromAnywhereChar && !(_state == VTStates::Escape && _isEngineForInput))
     {
+        // CAN and SUB cancel an APC string rather than complete it.
+        _isApcString = false;
         _ActionInterrupt();
         _ActionExecute(wch);
         _EnterGround();

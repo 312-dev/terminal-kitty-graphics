@@ -168,6 +168,8 @@ namespace Microsoft::Console::VirtualTerminal
                                        const DispatchTypes::SixelBackground backgroundSelect,
                                        const VTParameter backgroundColor) override; // SIXEL
 
+        void KittyGraphicsCommand(const std::wstring_view command) override;
+
         StringHandler DownloadDRCS(const VTInt fontNumber,
                                    const VTParameter startChar,
                                    const DispatchTypes::DrcsEraseControl eraseControl,
@@ -316,6 +318,8 @@ namespace Microsoft::Console::VirtualTerminal
         PageManager _pages;
         friend class SixelParser;
         std::shared_ptr<SixelParser> _sixelParser;
+        friend class KittyGraphics;
+        std::shared_ptr<KittyGraphics> _kittyGraphics;
         std::unique_ptr<FontBuffer> _fontBuffer;
         std::shared_ptr<MacroBuffer> _macroBuffer;
         std::optional<unsigned int> _initialCodePage;

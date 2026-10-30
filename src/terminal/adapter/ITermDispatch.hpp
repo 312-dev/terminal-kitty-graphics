@@ -172,6 +172,9 @@ public:
                                            const DispatchTypes::SixelBackground backgroundSelect,
                                            const VTParameter backgroundColor) = 0; // SIXEL
 
+    // Kitty graphics protocol: the APC content after its leading 'G'.
+    virtual void KittyGraphicsCommand(const std::wstring_view /*command*/) {}
+
     virtual StringHandler DownloadDRCS(const VTInt fontNumber,
                                        const VTParameter startChar,
                                        const DispatchTypes::DrcsEraseControl eraseControl,

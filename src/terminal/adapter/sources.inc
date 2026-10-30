@@ -36,6 +36,7 @@ SOURCES= \
     ..\MacroBuffer.cpp \
     ..\PageManager.cpp \
     ..\SixelParser.cpp \
+    ..\KittyGraphics.cpp \
     ..\adaptDispatchGraphics.cpp \
     ..\terminalOutput.cpp \
 
