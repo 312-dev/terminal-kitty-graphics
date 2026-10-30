@@ -36,6 +36,8 @@ namespace Microsoft::Console::VirtualTerminal
 
         bool ActionPassThroughString(const std::wstring_view string) noexcept override;
 
+        bool ActionApcDispatch(const std::wstring_view string) override;
+
         bool ActionEscDispatch(const VTID id) override;
 
         bool ActionVt52EscDispatch(const VTID id, const VTParameters parameters) override;

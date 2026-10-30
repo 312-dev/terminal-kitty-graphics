@@ -187,6 +187,23 @@ bool OutputStateMachineEngine::ActionPassThroughString(const std::wstring_view /
 }
 
 // Routine Description:
+// - Dispatches a complete APC string. Only kitty graphics commands, which
+//   start with 'G', are understood.
+// Arguments:
+// - string - the APC content, without ESC _ and the terminator.
+// Return Value:
+// - true iff we dispatched the string.
+bool OutputStateMachineEngine::ActionApcDispatch(const std::wstring_view string)
+{
+    if (!string.empty() && string.front() == L'G')
+    {
+        _dispatch->KittyGraphicsCommand(string.substr(1));
+        return true;
+    }
+    return false;
+}
+
+// Routine Description:
 // - Triggers the EscDispatch action to indicate that the listener should handle
 //      a simple escape sequence. These sequences traditionally start with ESC
 //      and a simple letter. No complicated parameters.

@@ -5,6 +5,7 @@
 
 #include "adaptDispatch.hpp"
 #include "SixelParser.hpp"
+#include "KittyGraphics.hpp"
 #include "../../inc/unicode.hpp"
 #include "../../renderer/base/renderer.hpp"
 #include "../../types/inc/CodepointWidthDetector.hpp"
@@ -90,6 +91,10 @@ void AdaptDispatch::PrintString(const std::wstring_view string)
             buffer.push_back(_termOutput.TranslateKey(wch));
         }
         _WriteToBuffer(buffer);
+    }
+    else if (_kittyGraphics && string.find(KittyGraphics::PlaceholderLead) != std::wstring_view::npos)
+    {
+        _kittyGraphics->WriteWithPlaceholders(string, [this](const std::wstring_view text) { _WriteToBuffer(text); });
     }
     else
     {
@@ -3033,6 +3038,9 @@ void AdaptDispatch::HardReset(bool erase)
     // Reset the Sixel parser.
     _sixelParser = nullptr;
 
+    // Forget all kitty graphics images.
+    _kittyGraphics = nullptr;
+
     // Completely reset the TerminalOutput state.
     _termOutput = {};
     // Reset the code page to the default value.
@@ -3906,6 +3914,30 @@ ITermDispatch::StringHandler AdaptDispatch::DefineSixelImage(const VTInt macroPa
         _sixelParser->SetDisplayMode(_modes.test(Mode::SixelDisplay));
     }
     return _sixelParser->DefineImage(macroParameter, backgroundSelect, backgroundColor);
+}
+
+// Method Description:
+// - Handles a kitty graphics protocol command (APC G ... ST).
+//   Inside ConPTY nothing happens: the raw sequence is forwarded to the
+//   terminal, which stores the image and answers the client.
+// Arguments:
+// - command - The APC content after the leading 'G'.
+void AdaptDispatch::KittyGraphicsCommand(const std::wstring_view command)
+{
+    if (_api.IsConPTY())
+    {
+        return;
+    }
+    try
+    {
+        // The kitty graphics state is created on demand.
+        if (!_kittyGraphics)
+        {
+            _kittyGraphics = std::make_shared<KittyGraphics>(*this);
+        }
+        _kittyGraphics->Command(command);
+    }
+    CATCH_LOG();
 }
 
 // Method Description:

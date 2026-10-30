@@ -218,6 +218,11 @@ namespace Microsoft::Console::VirtualTerminal
         BYTE _subParameterCounter;
 
         std::wstring _oscString;
+
+        // The APC string being collected, for kitty graphics commands.
+        bool _isApcString = false;
+        bool _apcStringOverflowed = false;
+        std::wstring _apcString;
         VTInt _oscParameter;
 
         IStateMachineEngine::StringHandler _dcsStringHandler;
