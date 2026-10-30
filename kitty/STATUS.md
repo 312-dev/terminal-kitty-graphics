@@ -1,8 +1,11 @@
 # Kitty graphics in Windows Terminal: fork status
 
-Personal fork (GraysonCAdams/terminal), branch `kitty-graphics` from tag v1.26.2734.0 (Preview).
+Public fork 312-dev/terminal-kitty-graphics (transferred from GraysonCAdams/terminal on
+2026-10-30), branch `kitty-graphics` from tag v1.26.2734.0 (Preview). Its front page is
+`.github/README.md`, which GitHub shows ahead of upstream's root README. GitHub Actions are off on
+the fork so upstream's CI never runs here.
 Goal: Claude Code's inline images, i.e. the kitty graphics subset it uses, nothing more.
-Local only; never PR upstream (AGENTS.md bans AI-authored contributions).
+Never PR upstream (AGENTS.md bans AI-authored contributions).
 
 ## Scope (what Claude Code sends)
 
