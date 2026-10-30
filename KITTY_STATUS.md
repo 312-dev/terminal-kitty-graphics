@@ -27,10 +27,25 @@ Local only; never PR upstream (AGENTS.md bans AI-authored contributions).
 
 ## State
 
-- [ ] VS Community 2026 installed from the tag's .vsconfig (winget, started 2026-10-30 13:26)
+- [x] VS Community 2026 installed from the tag's .vsconfig
 - [x] Developer Mode on (needed to register the dev package)
-- [ ] Build of CascadiaPackage succeeds
 - [x] Kitty code written (KittyGraphics.cpp/.hpp, parser APC collection, PrintString hook)
-- [ ] Build with kitty code, install as "Terminal Dev"
-- [ ] Test script (plain + placeholder) draws
-- [ ] Claude Code + show-your-work draws (force flag in profile env)
+- [x] Build with kitty code, install as "Terminal Dev" (2026-10-30)
+- [x] Test script (plain + placeholder) draws
+- [x] Claude Code + show-your-work draws (force flag in profile env)
+- [ ] Terminal Dev as the default terminal, sessions moved over
+- [ ] Scheduled rebase-and-rebuild on new Preview tags
+
+## Building
+
+C:\src\wt-build.ps1, run by the scheduled task "WT Kitty Build" under C:\src\tools\pwsh (portable
+PowerShell 7.6.9). Not from WSL: WSL passes both PATH and Path, and MSBuild dies on the duplicate
+(MSB6001). Not under the Store pwsh: build steps it starts cannot find pwsh.exe. Output msix:
+src\cascadia\CascadiaPackage\AppPackages\CascadiaPackage_0.0.1.0_x64_Test. Install: makeappx unpack
+to C:\src\wt-dev-loose, then Add-AppxPackage -Register its AppxManifest.xml (Developer Mode).
+
+## Settings
+
+Terminal Dev keeps its own settings (Packages\WindowsTerminalDev_8wekyb3d8bbwe\LocalState). They are
+the Preview settings plus `profiles.defaults.environment.CLAUDE_CODE_FORCE_TERMINAL_IMAGES = "1"`.
+WT itself adds profile environment names to WSLENV; setting WSLENV there drops WT_SESSION.
