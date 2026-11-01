@@ -22,6 +22,12 @@ terminal, which answers them.
 The code is in `src/terminal/adapter/KittyGraphics.cpp`, with small changes to the parser
 (`stateMachine.cpp`, which now collects APC strings) and `adaptDispatch.cpp`.
 
+The branch also makes touch screens work in full-screen programs. Upstream, touch only scrolls the
+terminal's own viewport, so a TUI that reads the mouse never sees a tap or a swipe. Here a tap is a
+left click, a swipe sends wheel events when the program reads the mouse (and scrolls the viewport
+otherwise), and a press held for 0.4 s before moving is a left-button drag that selects text
+(`TermControl.cpp`, `_TouchPressed` and the two after it).
+
 ## Building
 
 There are no released binaries. Build it yourself as a side-by-side "Terminal Dev" package, with
