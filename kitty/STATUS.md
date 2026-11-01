@@ -38,6 +38,11 @@ Never PR upstream (AGENTS.md bans AI-authored contributions).
 - [x] Claude Code + show-your-work draws (force flag in profile env)
 - [ ] Terminal Dev as the default terminal, sessions moved over
 - [x] Scheduled rebase-and-rebuild on new Preview tags (kitty/update.ps1, task "WT Kitty Update", Sundays 3 AM)
+- [x] Touch as mouse input: tap clicks, swipe scrolls (wheel events to mouse-reading programs), hold
+  0.4 s then drag selects. Tested on the touch screen 2026-10-31. Speed: one wheel notch per row of
+  finger travel (`TermControl.cpp`).
+- [x] kitty/restart.ps1: closes Terminal Dev, installs the pending build, reopens given dtach
+  sessions as tabs. Start it detached; run inline it dies with the window it closes.
 
 ## Building and updating
 
