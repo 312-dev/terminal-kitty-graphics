@@ -1998,11 +1998,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (type == Windows::Devices::Input::PointerDeviceType::Touch)
         {
-            // NB: I don't think this is correct because the touch should be in the center of the rect.
-            //     I suspect the point.Position() would be correct.
-            const auto contactRect = point.Properties().ContactRect();
-            til::point newTouchPoint{ til::math::rounding, contactRect.X, contactRect.Y };
-            _interactivity.TouchPressed(newTouchPoint.to_core_point());
+            _TouchPressed(point);
         }
         else
         {
@@ -2089,10 +2085,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         else if (type == Windows::Devices::Input::PointerDeviceType::Touch)
         {
-            const auto contactRect = point.Properties().ContactRect();
-            til::point newTouchPoint{ til::math::rounding, contactRect.X, contactRect.Y };
-
-            _interactivity.TouchMoved(newTouchPoint.to_core_point());
+            _TouchMoved(point, ControlKeyStates{ args.KeyModifiers() });
         }
 
         args.Handled(true);
@@ -2133,12 +2126,133 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         else if (type == Windows::Devices::Input::PointerDeviceType::Touch)
         {
-            _interactivity.TouchReleased();
+            _TouchReleased(point, ControlKeyStates{ args.KeyModifiers() });
         }
 
         _TryStopAutoScroll(ptr.PointerId());
 
         args.Handled(true);
+    }
+
+    // Touch has no mouse path of its own: on its own it only scrolls the
+    // terminal's viewport, so a program that reads the mouse (a full-screen
+    // TUI) never sees a tap or a swipe, and text cannot be selected. These turn
+    // one contact into the mouse input the rest of the control already
+    // handles:
+    // - a tap is a left click at that spot,
+    // - a swipe scrolls: mouse wheel events when the program reads the
+    //   mouse, otherwise the viewport, as before,
+    // - a press held still for a moment before moving is a left-button drag,
+    //   which selects text (in the program, or in the terminal).
+    static constexpr uint64_t TouchHoldBeforeDragMicroseconds = 400'000;
+    static constexpr int32_t WheelNotch = 120;
+
+    bool TermControl::_TouchGoesToApp(const ControlKeyStates modifiers) const
+    {
+        return !modifiers.IsShiftPressed() && winrt::get_self<ControlCore>(_core)->IsVtMouseModeEnabled();
+    }
+
+    void TermControl::_TouchPressed(const Windows::UI::Input::PointerPoint& point)
+    {
+        _touch = TouchGesture{
+            .pointerId = point.PointerId(),
+            .start = point.Position(),
+            .last = point.Position(),
+            .startTime = point.Timestamp(),
+        };
+    }
+
+    void TermControl::_TouchMoved(const Windows::UI::Input::PointerPoint& point, const ControlKeyStates modifiers)
+    {
+        if (!_touch || _touch->pointerId != point.PointerId())
+        {
+            return;
+        }
+        auto& touch = *_touch;
+        const auto position = point.Position();
+        const auto rowHeight = winrt::get_self<ControlCore>(_core)->FontSizeInDips().Height;
+
+        if (touch.mode == TouchGesture::Mode::Pending)
+        {
+            // Until the finger has moved half a row it is still a tap.
+            const auto distance = std::hypot(position.X - touch.start.X, position.Y - touch.start.Y);
+            if (distance < rowHeight / 2)
+            {
+                return;
+            }
+            if (point.Timestamp() - touch.startTime >= TouchHoldBeforeDragMicroseconds)
+            {
+                touch.mode = TouchGesture::Mode::Dragging;
+                _interactivity.PointerPressed(touch.pointerId,
+                                              Control::MouseButtonState::IsLeftButtonDown,
+                                              WM_LBUTTONDOWN,
+                                              touch.startTime,
+                                              modifiers,
+                                              _toTerminalOrigin(touch.start));
+            }
+            else
+            {
+                touch.mode = TouchGesture::Mode::Scrolling;
+                if (!_TouchGoesToApp(modifiers))
+                {
+                    _interactivity.TouchPressed(til::point{ til::math::rounding, touch.start.X, touch.start.Y }.to_core_point());
+                }
+            }
+        }
+
+        if (touch.mode == TouchGesture::Mode::Dragging)
+        {
+            _interactivity.PointerMoved(touch.pointerId,
+                                        Control::MouseButtonState::IsLeftButtonDown,
+                                        WM_MOUSEMOVE,
+                                        modifiers,
+                                        _toTerminalOrigin(position));
+        }
+        else if (_TouchGoesToApp(modifiers))
+        {
+            // One wheel notch per row the finger travels. Dragging down shows
+            // earlier output, as a wheel turned up does.
+            const auto rows = static_cast<int>((position.Y - touch.last.Y) / rowHeight);
+            for (auto i = 0; i < std::abs(rows); ++i)
+            {
+                _interactivity.MouseWheel(modifiers,
+                                          Core::Point{ 0, rows > 0 ? WheelNotch : -WheelNotch },
+                                          _toTerminalOrigin(position),
+                                          Control::MouseButtonState{});
+            }
+            touch.last.Y += rows * rowHeight;
+        }
+        else
+        {
+            _interactivity.TouchMoved(til::point{ til::math::rounding, position.X, position.Y }.to_core_point());
+        }
+    }
+
+    void TermControl::_TouchReleased(const Windows::UI::Input::PointerPoint& point, const ControlKeyStates modifiers)
+    {
+        if (!_touch || _touch->pointerId != point.PointerId())
+        {
+            return;
+        }
+        const auto touch = *_touch;
+        _touch.reset();
+
+        switch (touch.mode)
+        {
+        case TouchGesture::Mode::Pending:
+        {
+            const auto at = _toTerminalOrigin(touch.start);
+            _interactivity.PointerPressed(touch.pointerId, Control::MouseButtonState::IsLeftButtonDown, WM_LBUTTONDOWN, touch.startTime, modifiers, at);
+            _interactivity.PointerReleased(touch.pointerId, Control::MouseButtonState{}, WM_LBUTTONUP, modifiers, at);
+            break;
+        }
+        case TouchGesture::Mode::Dragging:
+            _interactivity.PointerReleased(touch.pointerId, Control::MouseButtonState{}, WM_LBUTTONUP, modifiers, _toTerminalOrigin(point.Position()));
+            break;
+        case TouchGesture::Mode::Scrolling:
+            _interactivity.TouchReleased();
+            break;
+        }
     }
 
     // Method Description:

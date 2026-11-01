@@ -311,6 +311,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::optional<std::chrono::high_resolution_clock::time_point> _lastAutoScrollUpdateTime;
         bool _pointerPressedInBounds{ false };
 
+        // One touch contact, turned into mouse input: a tap clicks, a swipe
+        // scrolls, and a press held before moving drags.
+        struct TouchGesture
+        {
+            enum class Mode
+            {
+                Pending,
+                Scrolling,
+                Dragging,
+            };
+            Mode mode = Mode::Pending;
+            uint32_t pointerId = 0;
+            Windows::Foundation::Point start{};
+            Windows::Foundation::Point last{};
+            uint64_t startTime = 0;
+        };
+        std::optional<TouchGesture> _touch;
+
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellLightAnimation{ nullptr };
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellDarkAnimation{ nullptr };
         SafeDispatcherTimer _bellLightTimer;
@@ -375,6 +393,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _PointerPressedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _PointerMovedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _PointerReleasedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _TouchPressed(const Windows::UI::Input::PointerPoint& point);
+        void _TouchMoved(const Windows::UI::Input::PointerPoint& point, const ::Microsoft::Terminal::Core::ControlKeyStates modifiers);
+        void _TouchReleased(const Windows::UI::Input::PointerPoint& point, const ::Microsoft::Terminal::Core::ControlKeyStates modifiers);
+        bool _TouchGoesToApp(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers) const;
         void _PointerExitedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _MouseWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _ScrollbarChangeHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs& e);
