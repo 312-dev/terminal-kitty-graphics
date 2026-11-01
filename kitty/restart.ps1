@@ -8,6 +8,8 @@
 #   restart.ps1 -Sessions gray-23,scrolly-2
 # Log: C:\src\wt-restart.log
 param([string[]]$Sessions = @())
+# Started with pwsh -File, "-Sessions a,b" arrives as the single string "a,b".
+$Sessions = $Sessions -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 
 Start-Transcript -Path 'C:\src\wt-restart.log' -Force | Out-Null
 try {
