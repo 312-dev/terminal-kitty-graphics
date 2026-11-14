@@ -60,6 +60,8 @@ Dev runs the build is left pending in C:\src\wt-dev\PENDING and the task "WT Kit
 Both tasks start pwsh through `conhost.exe --headless`: the default terminal is delegated to
 Windows Terminal, so a bare pwsh (even with `-WindowStyle Hidden`) flashes a tab and minimizes the
 window on every run.
+The rebase runs under Windows git, which has no global identity here: the repo's local config
+sets user.name and user.email, or every rebase fails and update.ps1 reports it as a conflict.
 Not from WSL: WSL passes both PATH and Path, and MSBuild dies on the duplicate
 (MSB6001). Not under the Store pwsh: build steps it starts cannot find pwsh.exe. Each build is
 unpacked to C:\src\wt-dev\<tag>-<time> (three kept) and registered from there (Developer Mode). The
