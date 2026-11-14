@@ -52,6 +52,9 @@ toasts. `-Force` rebuilds without a new release. A loose package registration ca
 (`-DeferRegistrationWhenPackagesAreInUse` is not in the `-Register` parameter set), so while Terminal
 Dev runs the build is left pending in C:\src\wt-dev\PENDING and the task "WT Kitty Install" runs
 `update.ps1 -InstallPending` every 30 minutes until Terminal Dev is closed.
+Both tasks start pwsh through `conhost.exe --headless`: the default terminal is delegated to
+Windows Terminal, so a bare pwsh (even with `-WindowStyle Hidden`) flashes a tab and minimizes the
+window on every run.
 Not from WSL: WSL passes both PATH and Path, and MSBuild dies on the duplicate
 (MSB6001). Not under the Store pwsh: build steps it starts cannot find pwsh.exe. Each build is
 unpacked to C:\src\wt-dev\<tag>-<time> (three kept) and registered from there (Developer Mode). The
