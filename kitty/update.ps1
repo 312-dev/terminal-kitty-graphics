@@ -17,9 +17,11 @@
 #      to where it was and the installed build is left alone.
 #
 # -Force rebuilds and reinstalls even when there is no new release.
+# -NoRebase rebuilds and reinstalls on the release kitty-graphics is already
+# based on, for shipping a fix while a newer release's rebase conflicts.
 # Log: C:\src\wt-update.log (C:\src\wt-install.log for -InstallPending);
 # MSBuild detail: C:\src\wt-msbuild.log.
-param([switch]$Force, [switch]$InstallPending)
+param([switch]$Force, [switch]$NoRebase, [switch]$InstallPending)
 
 $ErrorActionPreference = 'Continue'
 $repo = 'C:\src\wt'
@@ -98,11 +100,15 @@ try {
     [void](Invoke-Git fetch upstream "refs/tags/${tag}:refs/tags/$tag" --no-tags)
     $current = (& git -C $repo describe --tags --abbrev=0 --match 'v1.*' $branch 2>$null)
     "kitty-graphics is based on: $current"
+    if ($NoRebase) {
+        $tag = $current
+        "building on $tag without rebasing"
+    }
 
     # 2. Already on it?
     & git -C $repo merge-base --is-ancestor $tag $branch
     $upToDate = $LASTEXITCODE -eq 0
-    if ($upToDate -and -not $Force) {
+    if ($upToDate -and -not ($Force -or $NoRebase)) {
         'UPDATE-RESULT up-to-date'
         return
     }

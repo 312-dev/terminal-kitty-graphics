@@ -49,7 +49,8 @@ Never PR upstream (AGENTS.md bans AI-authored contributions).
 
 kitty/update.ps1, run weekly by the scheduled task "WT Kitty Update" under C:\src\tools\pwsh
 (portable PowerShell 7.6.9): rebases onto the newest Preview release, builds, pushes, installs, and
-toasts. `-Force` rebuilds without a new release. A loose package registration cannot be deferred
+toasts. `-Force` rebuilds without a new release; `-NoRebase` rebuilds on the current base (for a
+fix while the newest release's rebase conflicts). A loose package registration cannot be deferred
 (`-DeferRegistrationWhenPackagesAreInUse` is not in the `-Register` parameter set), so while Terminal
 Dev runs the build is left pending in C:\src\wt-dev\PENDING and the task "WT Kitty Install" runs
 `update.ps1 -InstallPending` every 30 minutes until Terminal Dev is closed.
