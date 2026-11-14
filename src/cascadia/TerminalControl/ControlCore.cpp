@@ -1131,8 +1131,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         const auto newDpi = static_cast<int>(lrint(_compositionScale * USER_DEFAULT_SCREEN_DPI));
 
-        _terminal->SetFontInfo(_actualFont);
-
         if (_renderEngine)
         {
             static constexpr auto cloneMap = [](const auto& map) {
@@ -1158,6 +1156,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             LOG_IF_FAILED(_renderEngine->UpdateDpi(newDpi));
             LOG_IF_FAILED(_renderEngine->UpdateFont(_desiredFont, _actualFont, featureMap, axesMap));
         }
+
+        // After UpdateFont, so the terminal gets the measured cell size in
+        // pixels (kitty images size their cells from it) rather than the
+        // requested font size.
+        _terminal->SetFontInfo(_actualFont);
     }
 
     void ControlCore::_raiseFontSizeChanged()
