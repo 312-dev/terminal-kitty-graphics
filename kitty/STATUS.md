@@ -25,7 +25,8 @@ Never PR upstream (AGENTS.md bans AI-authored contributions).
 - `AdaptDispatch` owns a `KittyGraphics` (src/terminal/adapter). Inside ConPTY it does nothing:
   conhost forwards the raw APC to the terminal and must not answer.
 - Placeholders: `PrintString` splits text at U+10EEEE, writes a space per placeholder, then paints
-  that cell's tile into the row's `ImageSlice` (cell size 20x40 virtual px; the renderer scales).
+  that cell's tile into the row's `ImageSlice` (cells 40 virtual px tall, as wide as the font's
+  cell shape gives, so pictures keep their aspect ratio; the renderer scales).
   Text written over a cell already erases its image pixels, so TUI redraws stay correct.
 
 ## State

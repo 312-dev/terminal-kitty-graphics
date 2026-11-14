@@ -7,6 +7,7 @@
 #include "adaptDispatch.hpp"
 #include "../buffer/out/ImageSlice.hpp"
 #include "../../types/inc/Viewport.hpp"
+#include "../../renderer/base/renderer.hpp"
 
 #include <wincodec.h>
 
@@ -437,19 +438,41 @@ bool KittyGraphics::_decode(const Transmission& t, Image& image, std::wstring& e
     return false;
 }
 
+// A cell CellHeight pixels tall with the font cell's shape: a canvas fitted
+// in cells of this shape is drawn undistorted once the renderer scales each
+// cell to the real one. A fixed 2:1 cell would draw every picture too wide
+// in a font whose cell is squarer (JetBrains Mono at line height 1.0 is
+// about 1.6:1). Without a font yet (or a renderer), 2:1.
+til::size KittyGraphics::_cellSize() const noexcept
+{
+    auto width = CellHeight / 2;
+    if (const auto renderer = _dispatcher._renderer)
+    {
+        const auto font = renderer->GetRenderData()->GetFontInfo().GetSize();
+        if (font.width > 0 && font.height > 0)
+        {
+            const auto shaped = std::lround(static_cast<double>(CellHeight) * font.width / font.height);
+            width = std::clamp(static_cast<til::CoordType>(shaped), CellHeight / 8, CellHeight * 2);
+        }
+    }
+    return { width, CellHeight };
+}
+
 const std::vector<RGBQUAD>& KittyGraphics::_canvas(Image& image)
 {
+    const auto cell = _cellSize();
     // Without a box, the image covers as many cells as its pixels need.
-    const auto columns = image.columns > 0 ? image.columns : (image.width + CellSize.width - 1) / CellSize.width;
-    const auto rows = image.rows > 0 ? image.rows : (image.height + CellSize.height - 1) / CellSize.height;
-    if (!image.canvas.empty() && image.canvasCells == til::size{ columns, rows })
+    const auto columns = image.columns > 0 ? image.columns : (image.width + cell.width - 1) / cell.width;
+    const auto rows = image.rows > 0 ? image.rows : (image.height + cell.height - 1) / cell.height;
+    if (!image.canvas.empty() && image.canvasCells == til::size{ columns, rows } && image.canvasCellSize == cell)
     {
         return image.canvas;
     }
 
     image.canvasCells = { columns, rows };
-    const auto canvasWidth = columns * CellSize.width;
-    const auto canvasHeight = rows * CellSize.height;
+    image.canvasCellSize = cell;
+    const auto canvasWidth = columns * cell.width;
+    const auto canvasHeight = rows * cell.height;
     image.canvas.assign(static_cast<size_t>(canvasWidth) * static_cast<size_t>(canvasHeight), RGBQUAD{});
 
     // Fit the image into the box, keeping its aspect ratio, centred.
@@ -493,17 +516,18 @@ void KittyGraphics::_paintCell(Page& page, const til::point at, Image& image, co
     auto& buffer = page.Buffer();
     auto& dstRow = buffer.GetMutableRowByOffset(at.y);
     auto slice = dstRow.GetMutableImageSlice();
-    if (!slice || slice->CellSize() != CellSize)
+    const auto cell = image.canvasCellSize;
+    if (!slice || slice->CellSize() != cell)
     {
-        slice = dstRow.SetImageSlice(std::make_unique<ImageSlice>(CellSize));
+        slice = dstRow.SetImageSlice(std::make_unique<ImageSlice>(cell));
     }
 
     auto dst = slice->MutablePixels(at.x, at.x + 1);
-    const auto canvasWidth = columns * CellSize.width;
-    auto src = canvas.begin() + static_cast<ptrdiff_t>(row) * CellSize.height * canvasWidth + static_cast<ptrdiff_t>(column) * CellSize.width;
-    for (auto y = 0; y < CellSize.height; ++y)
+    const auto canvasWidth = columns * cell.width;
+    auto src = canvas.begin() + static_cast<ptrdiff_t>(row) * cell.height * canvasWidth + static_cast<ptrdiff_t>(column) * cell.width;
+    for (auto y = 0; y < cell.height; ++y)
     {
-        std::copy_n(src, CellSize.width, dst);
+        std::copy_n(src, cell.width, dst);
         src += canvasWidth;
         dst += slice->PixelWidth();
     }

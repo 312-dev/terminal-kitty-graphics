@@ -29,9 +29,11 @@ namespace Microsoft::Console::VirtualTerminal
         static constexpr wchar_t PlaceholderLead = 0xDBFB;
         static constexpr wchar_t PlaceholderTrail = 0xDEEE;
 
-        // Each cell of a kitty image is stored at this size in an ImageSlice;
-        // the renderer scales it to the real cell.
-        static constexpr til::size CellSize{ 20, 40 };
+        // Each cell of a kitty image is stored in an ImageSlice CellHeight
+        // pixels tall and as wide as the font's own cell shape gives (see
+        // _cellSize); the renderer scales it to the real cell, so a picture
+        // keeps its aspect ratio whatever the font.
+        static constexpr til::CoordType CellHeight = 40;
 
         explicit KittyGraphics(AdaptDispatch& dispatcher) noexcept;
 
@@ -51,9 +53,10 @@ namespace Microsoft::Console::VirtualTerminal
             // Virtual placement box, in cells. 0 means derive from the size.
             til::CoordType columns = 0;
             til::CoordType rows = 0;
-            // The image fitted into columns x rows cells of CellSize, built
-            // on first paint.
+            // The image fitted into columns x rows cells of canvasCellSize,
+            // built on first paint and again when the font's shape changes.
             til::size canvasCells;
+            til::size canvasCellSize;
             std::vector<RGBQUAD> canvas;
         };
 
@@ -73,6 +76,7 @@ namespace Microsoft::Console::VirtualTerminal
         void _execute(Transmission& t);
         bool _decode(const Transmission& t, Image& image, std::wstring& error);
         void _placeDirect(uint32_t id, Image& image, const Transmission& t);
+        til::size _cellSize() const noexcept;
         const std::vector<RGBQUAD>& _canvas(Image& image);
         void _paintCell(Page& page, til::point at, Image& image, til::CoordType row, til::CoordType column);
         void _respond(const Transmission& t, std::wstring_view message);
