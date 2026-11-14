@@ -162,6 +162,7 @@ void KittyGraphics::Clear() noexcept
 {
     _images.clear();
     _pending.reset();
+    _open.reset();
     _totalBytes = 0;
 }
 
@@ -621,10 +622,89 @@ uint32_t KittyGraphics::_currentImageId() const noexcept
     return 0;
 }
 
+// Reads diacritics at i into marks from index count on, stopping at the
+// first other character; returns the number of marks now held.
+size_t KittyGraphics::_readMarks(const std::wstring_view text, size_t& i, Marks& marks, size_t count) noexcept
+{
+    while (count < marks.size() && i < text.size())
+    {
+        auto peek = i;
+        const auto index = _diacriticIndex(readCodePoint(text, peek));
+        if (index < 0)
+        {
+            break;
+        }
+        marks[count++] = index;
+        i = peek;
+    }
+    return count;
+}
+
+// The cell a placeholder with these marks stands for. Missing marks continue
+// the run in the cell to the left.
+KittyGraphics::Cell KittyGraphics::_cellFor(const uint32_t baseId, const Marks& marks, const Cell& previous, const bool adjacent) noexcept
+{
+    auto id = baseId;
+    if (marks[2] >= 0)
+    {
+        id |= static_cast<uint32_t>(marks[2]) << 24;
+    }
+    const auto continues = adjacent && previous.imageId == id;
+    Cell cell{ id, marks[0], marks[1] };
+    if (cell.row < 0)
+    {
+        cell.row = continues ? previous.row : 0;
+    }
+    if (cell.column < 0)
+    {
+        cell.column = continues && cell.row == previous.row ? previous.column + 1 : 0;
+    }
+    return cell;
+}
+
+void KittyGraphics::_paintPlaced(Page& page, const til::point at, const Cell& cell)
+{
+    if (const auto it = _images.find(cell.imageId); it != _images.end() && at.x >= 0)
+    {
+        _paintCell(page, at, it->second, cell.row, cell.column);
+        page.Buffer().TriggerRedraw(Microsoft::Console::Types::Viewport::FromExclusive({ at.x, at.y, at.x + 1, at.y + 1 }));
+    }
+}
+
+bool KittyGraphics::HasOpenCell() const noexcept
+{
+    return _open.has_value();
+}
+
 void KittyGraphics::WriteWithPlaceholders(const std::wstring_view text, const std::function<void(std::wstring_view)>& writeText)
 {
     size_t segmentStart = 0;
     size_t i = 0;
+
+    // Marks that start this text belong to the previous text's last
+    // placeholder (see OpenCell), as long as nothing has moved the cursor
+    // since: read them and paint that cell again with them.
+    if (auto open = std::exchange(_open, std::nullopt))
+    {
+        auto page = _dispatcher._pages.ActivePage();
+        if (page.Cursor().GetPosition() == open->cursorAfter)
+        {
+            const auto count = _readMarks(text, i, open->marks, open->count);
+            if (count > open->count)
+            {
+                segmentStart = i;
+                const auto cell = _cellFor(open->baseId, open->marks, open->previous, open->adjacent);
+                _paintPlaced(page, open->written, cell);
+                _lastCell = cell;
+                if (i == text.size() && count < open->marks.size())
+                {
+                    open->count = count;
+                    _open = open;
+                }
+            }
+        }
+    }
+
     while (i < text.size())
     {
         const auto start = i;
@@ -639,43 +719,16 @@ void KittyGraphics::WriteWithPlaceholders(const std::wstring_view text, const st
 
         // Up to three diacritics follow: row, column, and the image id's
         // highest byte.
-        std::array<til::CoordType, 3> marks{ -1, -1, -1 };
-        for (auto& mark : marks)
-        {
-            auto peek = i;
-            if (peek >= text.size())
-            {
-                break;
-            }
-            const auto index = _diacriticIndex(readCodePoint(text, peek));
-            if (index < 0)
-            {
-                break;
-            }
-            mark = index;
-            i = peek;
-        }
+        Marks marks{ -1, -1, -1 };
+        const auto count = _readMarks(text, i, marks, 0);
         segmentStart = i;
 
-        auto id = _currentImageId();
-        if (marks[2] >= 0)
-        {
-            id |= static_cast<uint32_t>(marks[2]) << 24;
-        }
-
-        // Missing marks continue the run in the cell to the left.
+        const auto baseId = _currentImageId();
         auto page = _dispatcher._pages.ActivePage();
         const auto before = page.Cursor().GetPosition();
-        const auto continues = _lastCell.imageId == id && _lastCellAt == til::point{ before.x - 1, before.y };
-        Cell cell{ id, marks[0], marks[1] };
-        if (cell.row < 0)
-        {
-            cell.row = continues ? _lastCell.row : 0;
-        }
-        if (cell.column < 0)
-        {
-            cell.column = continues && cell.row == _lastCell.row ? _lastCell.column + 1 : 0;
-        }
+        const auto previous = _lastCell;
+        const auto adjacent = _lastCellAt == til::point{ before.x - 1, before.y };
+        const auto cell = _cellFor(baseId, marks, previous, adjacent);
 
         writeText(L" ");
 
@@ -685,13 +738,14 @@ void KittyGraphics::WriteWithPlaceholders(const std::wstring_view text, const st
         const auto& cursor = page.Cursor();
         const auto after = cursor.GetPosition();
         const auto written = cursor.GetDelayEOLWrap() ? after : til::point{ after.x - 1, after.y };
-        if (const auto it = _images.find(id); it != _images.end() && written.x >= 0)
-        {
-            _paintCell(page, written, it->second, cell.row, cell.column);
-            page.Buffer().TriggerRedraw(Microsoft::Console::Types::Viewport::FromExclusive({ written.x, written.y, written.x + 1, written.y + 1 }));
-        }
+        _paintPlaced(page, written, cell);
         _lastCell = cell;
         _lastCellAt = written;
+
+        if (i == text.size() && count < marks.size())
+        {
+            _open = OpenCell{ baseId, marks, count, previous, adjacent, written, after };
+        }
     }
     if (segmentStart < text.size())
     {

@@ -42,6 +42,10 @@ namespace Microsoft::Console::VirtualTerminal
         // Writes text that contains placeholders: the text around them goes
         // through writeText, each placeholder becomes a painted space.
         void WriteWithPlaceholders(std::wstring_view text, const std::function<void(std::wstring_view)>& writeText);
+        // True while the last placeholder written may still get marks from
+        // the next text (see OpenCell): that text must come here even when
+        // it holds no placeholder.
+        bool HasOpenCell() const noexcept;
         void Clear() noexcept;
 
     private:
@@ -73,6 +77,24 @@ namespace Microsoft::Console::VirtualTerminal
             til::CoordType column = -1;
         };
 
+        using Marks = std::array<til::CoordType, 3>;
+
+        // A placeholder that ended its text with fewer than three marks.
+        // ConPTY passes output on in pieces cut anywhere, so the rest of its
+        // marks can start the next text; they are read there and the cell is
+        // painted again, instead of being drawn as combining characters.
+        struct OpenCell
+        {
+            uint32_t baseId = 0;
+            Marks marks{ -1, -1, -1 };
+            size_t count = 0;
+            // The cell to its left when it was written, for missing marks.
+            Cell previous;
+            bool adjacent = false;
+            til::point written;
+            til::point cursorAfter;
+        };
+
         void _execute(Transmission& t);
         bool _decode(const Transmission& t, Image& image, std::wstring& error);
         void _placeDirect(uint32_t id, Image& image, const Transmission& t);
@@ -81,6 +103,9 @@ namespace Microsoft::Console::VirtualTerminal
         void _paintCell(Page& page, til::point at, Image& image, til::CoordType row, til::CoordType column);
         void _respond(const Transmission& t, std::wstring_view message);
         static til::CoordType _diacriticIndex(char32_t ch) noexcept;
+        static size_t _readMarks(std::wstring_view text, size_t& i, Marks& marks, size_t count) noexcept;
+        static Cell _cellFor(uint32_t baseId, const Marks& marks, const Cell& previous, bool adjacent) noexcept;
+        void _paintPlaced(Page& page, til::point at, const Cell& cell);
         uint32_t _currentImageId() const noexcept;
 
         AdaptDispatch& _dispatcher;
@@ -88,6 +113,7 @@ namespace Microsoft::Console::VirtualTerminal
         std::optional<Transmission> _pending;
         Cell _lastCell;
         til::point _lastCellAt{ -1, -1 };
+        std::optional<OpenCell> _open;
         size_t _totalBytes = 0;
     };
 }

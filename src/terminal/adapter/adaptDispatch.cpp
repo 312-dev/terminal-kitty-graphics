@@ -92,7 +92,7 @@ void AdaptDispatch::PrintString(const std::wstring_view string)
         }
         _WriteToBuffer(buffer);
     }
-    else if (_kittyGraphics && string.find(KittyGraphics::PlaceholderLead) != std::wstring_view::npos)
+    else if (_kittyGraphics && (_kittyGraphics->HasOpenCell() || string.find(KittyGraphics::PlaceholderLead) != std::wstring_view::npos))
     {
         _kittyGraphics->WriteWithPlaceholders(string, [this](const std::wstring_view text) { _WriteToBuffer(text); });
     }
