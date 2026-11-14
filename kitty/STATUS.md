@@ -28,6 +28,9 @@ Never PR upstream (AGENTS.md bans AI-authored contributions).
   that cell's tile into the row's `ImageSlice` (cells 40 virtual px tall, as wide as the font's
   cell shape gives, so pictures keep their aspect ratio; the renderer scales).
   Text written over a cell already erases its image pixels, so TUI redraws stay correct.
+  ConPTY cuts output anywhere, so a placeholder's marks can start the next `PrintString`; a
+  placeholder ending its text short of three marks stays open, and leading marks of the next text
+  (cursor unmoved) are read into it and the cell repainted. Without this they drew as coloured specks.
 
 ## State
 
